@@ -85,7 +85,7 @@ resource "google_compute_instance" "cameyo" {
   machine_type              = "e2-highmem-8"
   tags                      = ["http", "http-server", "https", "https-server", "ping", "rdp"]
   project                   = var.gcp_project_id
-  can_ip_forward            = false
+  can_ip_forward            = true #Misconfiguration
   allow_stopping_for_update = true
 
   #Primary local VPC network (NIC0)
@@ -102,9 +102,61 @@ resource "google_compute_instance" "cameyo" {
 
   boot_disk {
     initialize_params {
-      image = "windows-server-2022-dc-v20221109"
+      image = "windows-server-2012-r2-dc-v20230216"
       type  = "pd-ssd"
-      size  = "500"
+      size  = "100"
+    }
+  }
+
+  shielded_instance_config {
+    enable_secure_boot          = false #Misconfiguration
+    enable_vtpm                 = false #Misconfiguration
+    enable_integrity_monitoring = false #Misconfiguration
+  }
+
+  #Define API scopes for GCE Service Account.
+  service_account {
+    email  = google_service_account.cameyo-poc-sa-ce.email
+    scopes = var.sa-ce-scopes
+  }
+
+  metadata = {
+    enable-os-login    = false #Misconfiguration
+    serial-port-enable = true  #Misconfiguration
+  }
+}
+
+
+###############################################################################
+# Deploy Compute Instance 2
+###############################################################################
+
+resource "google_compute_instance" "debian-test-vm-flow" {
+  name                      = "debian-test-vm"
+  zone                      = "europe-west4-b"
+  machine_type              = "e2-highmem-8"
+  tags                      = ["http", "http-server", "https", "https-server", "ping", "rdp"]
+  project                   = var.gcp_project_id
+  can_ip_forward            = true #Misconfiguration
+  allow_stopping_for_update = true
+
+  #Primary local VPC network (NIC0)
+
+  network_interface {
+    network    = google_compute_network.vpc_network.id
+    network_ip = google_compute_address.private_static_ip.address
+    subnetwork = var.local_vpc_cameyo_subnet_name
+
+    access_config {
+      nat_ip = google_compute_address.public_static_ip.address
+    }
+  }
+
+  boot_disk {
+    initialize_params {
+      image = "debian-10-buster-v20230206"
+      type  = "pd-ssd"
+      size  = "100"
     }
   }
 
@@ -211,7 +263,6 @@ resource "google_compute_firewall" "ingress-cameyo-https-traffic" {
   source_ranges = [
     "0.0.0.0/0"
   ]
-  target_tags = ["https-server"]
 }
 
 # FW Rule 6  - Allow IAP SSH traffic to Cameyo
@@ -250,24 +301,7 @@ resource "google_compute_firewall" "ingress-cameyo-rdp-traffic-internal" {
   target_tags = ["rdp"]
 }
 
-# FW Rule 8  - Allow RDP traffic IPv4
-
-resource "google_compute_firewall" "ingress-cameyo-rdp-traffic" {
-  name    = "allow-ingress-cameyo-rdp"
-  network = var.local_vpc_cameyo_network_name
-
-  direction = "INGRESS"
-  allow {
-    protocol = "tcp"
-    ports    = ["3389"]
-  }
-  source_ranges = [
-    "37.17.208.21/32", "82.180.146.126/32"
-  ]
-  target_tags = ["rdp"]
-}
-
-# FW Rule 9  - Allow RDP traffic IPv6
+# FW Rule 8  - Allow RDP traffic IPv6
 
 resource "google_compute_firewall" "ingress-cameyo-rdp-trafficipv6" {
   name    = "allow-ingress-cameyo-rdp-ipv6"
@@ -282,4 +316,63 @@ resource "google_compute_firewall" "ingress-cameyo-rdp-trafficipv6" {
     "2a02:a44a:d44e:1:2142:6b3f:ccab:2ea4"
   ]
   target_tags = ["rdp"]
+}
+
+#Create Google Storage bucket that will host source code in region Europe West1
+resource "google_storage_bucket" "default" {
+  name     = "open-storage-bucket"
+  location = "europe-west1"
+}
+
+resource "google_storage_bucket_iam_member" "member" {
+  bucket = google_storage_bucket.default.name
+  role   = "roles/storage.viewer"
+  member = "allUsers"
+}
+
+# https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster
+resource "google_container_cluster" "primary" {
+  name                     = "primary"
+  location                 = "us-central1-a"
+  remove_default_node_pool = false
+  initial_node_count       = 2
+  network                  = var.local_vpc_cameyo_network_name
+  subnetwork               = var.local_vpc_cameyo_subnet_name
+  logging_service          = "logging.googleapis.com/kubernetes"
+  monitoring_service       = "monitoring.googleapis.com/kubernetes"
+  networking_mode          = "VPC_NATIVE"
+
+  # Optional, if you want multi-zonal cluster
+  node_locations = [
+    "us-central1-b"
+  ]
+
+  addons_config {
+    http_load_balancing {
+      disabled = true
+    }
+    horizontal_pod_autoscaling {
+      disabled = false
+    }
+  }
+
+  release_channel {
+    channel = "REGULAR"
+  }
+
+  workload_identity_config {
+    workload_pool = "devops-v4.svc.id.goog"
+  }
+
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "k8s-pod-range"
+    services_secondary_range_name = "k8s-service-range"
+  }
+
+  private_cluster_config {
+    enable_private_nodes    = false
+    enable_private_endpoint = false
+    master_ipv4_cidr_block  = "172.16.0.0/28"
+  }
+
 }

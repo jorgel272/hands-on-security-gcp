@@ -4,7 +4,7 @@
 
 variable "gcp_project_id" {
   type    = string
-  default = "gavra-cameyo"
+  default = "-"
 }
 
 variable "gcp_region" {
@@ -67,7 +67,3 @@ variable "public_static_ip" {
   type        = string
   default     = null
 }
-
-###############################################################################
-# Variables for Google Cloud VPN deployment
-###############################################################################
