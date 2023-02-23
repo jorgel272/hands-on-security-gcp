@@ -4,7 +4,7 @@
 
 variable "gcp_project_id" {
   type    = string
-  default = "-"
+  default = "instruqt"
 }
 
 variable "gcp_region" {
@@ -16,6 +16,12 @@ variable "gcp_region" {
 variable "gcp_zone_primary" {
   description = "GCP Primary region, zone in The Netherlands"
   default     = "europe-west4-b"
+  type        = string
+}
+
+variable "gcp_zone_secondary" {
+  description = "GCP Primary region, zone in The Netherlands"
+  default     = "europe-west4-c"
   type        = string
 }
 
