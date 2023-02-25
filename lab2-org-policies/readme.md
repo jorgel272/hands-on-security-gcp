@@ -21,3 +21,15 @@ listPolicy:
 gcloud beta resource-manager org-policies set-policy cc-restrict-gcp-location-policy.yaml --project  jorgeliauwnl
 
 4. Create Compute Engine and select region
+
+====
+
+Create yaml file
+nano cc-restrict-gcp-loadbalancer-policy.yaml
+
+constraint: constraints/compute.restrictLoadBalancerCreationForTypes
+listPolicy:
+  allowed_values:
+    in:INTERNAL
+
+gcloud beta resource-manager org-policies set-policy cc-restrict-gcp-loadbalancer-policy.yaml --project  jorgeliauwnl

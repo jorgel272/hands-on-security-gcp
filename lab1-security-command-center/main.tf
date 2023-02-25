@@ -12,6 +12,12 @@ resource "google_project_service" "compute" {
   disable_on_destroy         = false
 }
 
+resource "google_project_service" "compute" {
+  service                    = "container.googleapis.com"
+  disable_dependent_services = false
+  disable_on_destroy         = false
+}
+
 resource "google_project_service" "service_networking" {
   service                    = "servicenetworking.googleapis.com"
   disable_dependent_services = false
@@ -177,7 +183,7 @@ resource "google_compute_instance" "debian-test-vm-flow" {
 
 #Create Google Storage bucket that will host source code in region Europe West1
 resource "google_storage_bucket" "default" {
-  name     = "open-storage-bucket"
+  name     = "open-storage-bucket234tgfesdw"
   location = "europe-west1"
 }
 
@@ -192,8 +198,8 @@ resource "google_storage_bucket_iam_member" "default" {
 ###############################################################################
 
 # https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster
-resource "google_container_cluster" "demo-gke" {
-  name                     = "demo-gke"
+resource "google_container_cluster" "demo-gk2132e" {
+  name                     = "demo-gke342"
   location                 = var.gcp_zone_primary
   remove_default_node_pool = false
   initial_node_count       = 2
